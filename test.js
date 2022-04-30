@@ -23,22 +23,30 @@ test('generates the stream correctly', () => {
 });
 
 function turns(commands) {
-  //const stop = new Subject();
-  const stop = timer(99);
-  return commands.pipe(takeUntil(stop), map(i => `turn ${i + 1}`));
+  const stop = new Subject();
+  return {
+    observable: commands.pipe(takeUntil(stop), map(i => `turn ${i + 1}`)),
+    stop: () => stop.next(),
+  };
 }
 
 test('takes all commands', (done) => {
-
   const commands = interval(20);
+  
   const ts = turns(commands);
   const recordedTurns = [];
 
-  ts.subscribe(turn => {
+  const stop = timer(99);
+  stop.subscribe(() => {
+    ts.stop();
+  });
+
+  ts.observable.subscribe(turn => {
     if (recordedTurns.length == 4) {
       done('Too many turns');
     }
 
+    console.log(turn);
     recordedTurns.push(turn);
     
     if (recordedTurns.length == 4) {
