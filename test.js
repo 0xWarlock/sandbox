@@ -40,7 +40,8 @@ function turns({ commands, ticksPerTurn }) {
   const observables = commands
     .pipe(
       groupBy(c => c.userId),
-      mergeMap(user => user.pipe(distinct(u => u.userId)))
+      // mergeMap(user => user.pipe(distinct(u => u.userId)))
+      mergeMap(user => user.pipe(first()))
     );
 
     return merge(observables);
