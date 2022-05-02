@@ -1,5 +1,15 @@
 const { TestScheduler } = require('rxjs/testing');
-const { interval, map, Subject, takeUntil, throttleTime, timer } = require('rxjs');
+const {
+  distinct,
+  from,
+  interval,
+  map,
+  Subject,
+  takeUntil,
+  throttleTime,
+  toArray,
+  timer
+} = require('rxjs');
 
 const testScheduler = new TestScheduler((actual, expected) => {
   // asserting the two objects are equal - required
@@ -22,54 +32,65 @@ test('generates the stream correctly', () => {
   });
 });
 
-function turns(commands) {
-  const stop = new Subject();
-  return {
-    observable: commands.pipe(takeUntil(stop), map(i => `turn ${i + 1}`)),
-    stop: () => stop.next(),
-  };
+function turns({ commands, ticksPerTurn }) {
+  console.log(commands);
+  const commandObservables = commands
+    .pipe(distinct(c => c.userId));
+
+  return commandObservables;
 }
 
-test('takes all commands', (done) => {
-  const commands = interval(20);
-  
-  const ts = turns(commands);
-  const recordedTurns = [];
+function generateCommands(commands) {
+  return from(commands);
+}
 
-  const stop = timer(99);
-  stop.subscribe(() => {
-    ts.stop();
+test('throttles characters', done => {
+  const commands = generateCommands([
+    {
+      tick: 0,
+      userId: 'u0',
+      commandId: 'c0',
+    },
+    {
+      tick: 1,
+      userId: 'u0',
+      commandId: 'c1',
+    },
+    {
+      tick: 2,
+      userId: 'u1',
+      commandId: 'c2'
+    }
+  ]);
+  
+  const ts = turns({
+    commands,
+    ticksPerTurn: 5,
   });
 
-  ts.observable.subscribe(turn => {
-    if (recordedTurns.length == 4) {
+  const recordedTurns = [];
+
+  ts.subscribe(turn => {
+    if (recordedTurns.length == 2) {
       done('Too many turns');
     }
 
-    console.log(turn);
     recordedTurns.push(turn);
     
-    if (recordedTurns.length == 4) {
-      expect(recordedTurns).toEqual(['turn 1', 'turn 2', 'turn 3', 'turn 4']);
+    if (recordedTurns.length == 2) {
+      expect(recordedTurns).toEqual([
+        {
+          tick: 0,
+          userId: 'u0',
+          commandId: 'c0',
+        },
+        {
+          tick: 2,
+          userId: 'u1',
+          commandId: 'c2',
+        },
+      ]);
       done();
     }
   });
 });
-
-// test('takes all commands', () => {
-//   testScheduler.run((helpers) => {
-//     const { cold, expectObservable } = helpers;
-//     const commands = cold('10ms a 9ms b 9ms c 9ms d|');
-//     const expected =      '10ms a 9ms b 9ms c 9ms d|';
-//     const values = {
-//       a: 1,
-//       b: 2,
-//       c: 3,
-//       d: 4, 
-//     }
-
-//     const turnsObservable = turns(commands).pipe(take(4));
-
-//     expectObservable(turnsObservable).toBe(expected, values);
-//   });
-// });
