@@ -1,14 +1,18 @@
 const { TestScheduler } = require('rxjs/testing');
 const {
-  distinct,
+  distinct, first,
   from,
   interval,
   map,
+  merge,
+  mergeMap,
+  single,
   Subject,
   takeUntil,
   throttleTime,
   toArray,
-  timer
+  timer,
+  groupBy
 } = require('rxjs');
 
 const testScheduler = new TestScheduler((actual, expected) => {
@@ -33,11 +37,13 @@ test('generates the stream correctly', () => {
 });
 
 function turns({ commands, ticksPerTurn }) {
-  console.log(commands);
-  const commandObservables = commands
-    .pipe(distinct(c => c.userId));
+  const observables = commands
+    .pipe(
+      groupBy(c => c.userId),
+      mergeMap(user => user.pipe(distinct(u => u.userId)))
+    );
 
-  return commandObservables;
+    return merge(observables);
 }
 
 function generateCommands(commands) {
@@ -76,7 +82,7 @@ test('throttles characters', done => {
     }
 
     recordedTurns.push(turn);
-    
+    console.log(turn);
     if (recordedTurns.length == 2) {
       expect(recordedTurns).toEqual([
         {
