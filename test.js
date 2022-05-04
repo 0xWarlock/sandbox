@@ -37,14 +37,16 @@ test('generates the stream correctly', () => {
 });
 
 function turns({ commands, ticksPerTurn }) {
+  // const ticks = 
+
   const observables = commands
     .pipe(
       groupBy(c => c.userId),
       // mergeMap(user => user.pipe(distinct(u => u.userId)))
       mergeMap(user => user.pipe(first()))
     );
-
-    return merge(observables);
+    return observables;
+    // return merge(observables);
 }
 
 function generateCommands(commands) {
@@ -58,7 +60,7 @@ test('throttles characters', done => {
       userId: 'u0',
       commandId: 'c0',
     },
-    {
+    { 
       tick: 1,
       userId: 'u0',
       commandId: 'c1',
@@ -83,7 +85,7 @@ test('throttles characters', done => {
     }
 
     recordedTurns.push(turn);
-    console.log(turn);
+    
     if (recordedTurns.length == 2) {
       expect(recordedTurns).toEqual([
         {
