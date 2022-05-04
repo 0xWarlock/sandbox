@@ -1,5 +1,6 @@
 const { TestScheduler } = require('rxjs/testing');
 const {
+  distinctUntilChanged,
   distinct, first,
   from,
   interval,
@@ -9,10 +10,12 @@ const {
   single,
   Subject,
   takeUntil,
+  throttle,
   throttleTime,
   toArray,
   timer,
-  groupBy
+  groupBy,
+  Observable
 } = require('rxjs');
 
 const testScheduler = new TestScheduler((actual, expected) => {
@@ -37,16 +40,16 @@ test('generates the stream correctly', () => {
 });
 
 function turns({ commands, ticksPerTurn }) {
-  // const ticks = 
-
-  const observables = commands
+    const observables = commands
     .pipe(
       groupBy(c => c.userId),
-      // mergeMap(user => user.pipe(distinct(u => u.userId)))
-      mergeMap(user => user.pipe(first()))
+      mergeMap(user => user.pipe(
+        distinctUntilChanged((prev, curr) => {
+          return curr.tick - prev.tick < ticksPerTurn;
+        })
+      )),
     );
     return observables;
-    // return merge(observables);
 }
 
 function generateCommands(commands) {
@@ -69,37 +72,85 @@ test('throttles characters', done => {
       tick: 2,
       userId: 'u1',
       commandId: 'c2'
-    }
+    },
+    {
+      tick: 3,
+      userId: 'u0',
+      commandId: 'c3',
+    },
+    { 
+      tick: 4,
+      userId: 'u0',
+      commandId: 'c4',
+    },
+    {
+      tick: 5,
+      userId: 'u1',
+      commandId: 'c5',
+    },
+    {
+      tick: 6,
+      userId: 'u0',
+      commandId: 'c6',
+    },
+    {
+      tick: 7,
+      userId: 'u1',
+      commandId: 'c7',
+    },
+    {
+      tick: 11,
+      userId: 'u1',
+      commandId: 'c8',
+    },
   ]);
   
   const ts = turns({
     commands,
-    ticksPerTurn: 5,
+    ticksPerTurn: 4,
   });
 
   const recordedTurns = [];
 
   ts.subscribe(turn => {
-    if (recordedTurns.length == 2) {
+    if (recordedTurns.length == 5) {
       done('Too many turns');
     }
 
     recordedTurns.push(turn);
     
-    if (recordedTurns.length == 2) {
-      expect(recordedTurns).toEqual([
-        {
-          tick: 0,
-          userId: 'u0',
-          commandId: 'c0',
-        },
-        {
-          tick: 2,
-          userId: 'u1',
-          commandId: 'c2',
-        },
-      ]);
-      done();
+    if (recordedTurns.length == 5) {
+      try { 
+        expect(recordedTurns).toEqual([
+          {
+            tick: 0,
+            userId: 'u0',
+            commandId: 'c0',
+          },
+          {
+            tick: 2,
+            userId: 'u1',
+            commandId: 'c2',
+          },
+          {
+            tick: 4,
+            userId: 'u0',
+            commandId: 'c4',
+          },
+          {
+            tick: 7,
+            userId: 'u1',
+            commandId: 'c7',
+          },
+          {
+            tick: 11,
+            userId: 'u1',
+            commandId: 'c8',
+          },
+        ]);
+      } finally {
+        done();
+      }
     }
   });
 });
